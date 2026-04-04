@@ -1,74 +1,123 @@
-# Chatbot FCE - Automatización con n8n
+# Chatbot FCE - Automatizacion con n8n
 
-## Descripción de proyecto
+MVP de un asistente academico para la Facultad de Ciencias Economicas
+(UNCUYO) sobre WhatsApp Business Cloud, n8n, Postgres, pgvector y OpenAI.
 
-Chatbot FCE es una herramienta de chat para los estudiantes de la Facultad de Ciencias Económicas (UNCUYO). A través de ella se pueden hacer consultas académicas/administrativas y obtener respuestas automatizadas rápidamente. La herramienta también es capaz de determinar cuando la situación requiere de intervención humana y derivar el caso a quien corresponda.
+## Estado actual
 
-El canal de comunicación entre los usuarios y Chatbot FCE es WhatsApp, que se conecta a n8n a través de WhatsApp Cloud API.
+El proyecto ya tiene implementada la base operativa:
 
-## Configuración inicial
+- `pgvector` compilado e instalado sobre PostgreSQL 17
+- extension `vector` creada en la base `chatbot_fce`
+- esquema SQL aplicado
+- FAQs cargadas en Postgres con embeddings reales
+- sub-workflows y workflow principal creados en n8n
+- envio de respuestas por el nodo oficial `WhatsApp Business Cloud`
 
-- Servidor n8n: contamos con una instancia de n8n dockerizada en un servidor propio
-- WhatsApp Cloud API: la configuración requiere de algunos pasos
-    - Crear un portfolio de negocios en Facebook
-    - Acceder a developers.facebook.com y crear una app
-    - Configurar nuestra cuenta de WhatsApp Business API con número y token de autenticación
+Detalle del estado y del proceso ejecutado:
 
-## Workflows
+- [docs/estado_actual.md](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n-fce/docs/estado_actual.md)
 
-### Flujo principal
+## Estructura
 
-El flujo principal recibe mensajes de WhatsApp vía webhook, los clasifica y los resuelve por distintos caminos según su tipo.
+- [AGENTS.md](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n-fce/AGENTS.md): contrato funcional del proyecto
+- [db/schema.sql](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n-fce/db/schema.sql): tablas, indices y funciones SQL
+- [scripts/ingest_faqs.py](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n-fce/scripts/ingest_faqs.py): carga de FAQs a Postgres + pgvector
+- [scripts/install_pgvector_windows.ps1](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n-fce/scripts/install_pgvector_windows.ps1): instalacion de pgvector en Windows
+- [tests/test_ingest_faqs.py](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n-fce/tests/test_ingest_faqs.py): tests basicos de normalizacion e ingesta
+- [n8n/workflows](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n-fce/n8n/workflows): fuentes SDK de los workflows
+- [preguntas_frecuentes.csv](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n-fce/preguntas_frecuentes.csv): dataset inicial
 
-1. **Webhook Trigger** — Recibe el POST entrante desde WhatsApp Cloud API.
-2. **Normalizar mensaje** — Transforma el payload crudo en una estructura estandarizada (remitente, texto, metadatos).
-3. **Switch tipo** — Enruta el mensaje según su naturaleza usando reglas:
-   - **`faq`** → rama de preguntas frecuentes
-   - **`document`** → rama de consulta sobre documentos
-   - **`fallback`** → rama de agente IA general
+## Base de datos
 
----
+La base objetivo actual es `chatbot_fce`.
 
-#### Rama FAQ
+El esquema crea:
 
-4. **Preparar FAQ directo** — Arma la query a ejecutar contra la base de datos.
-5. **Buscar en FAQs** (`executeQuery`) — Consulta PostgreSQL buscando la FAQ más relevante.
-6. **Construir respuesta FAQ** — Formatea el resultado de la query en texto legible.
-7. **If1** — Verifica si se encontró un resultado válido:
-   - `true` → envía la respuesta directamente a **Send message**
-   - `false` → deriva al agente IA (ver rama fallback)
+- `users`
+- `conversations`
+- `messages`
+- `faqs`
+- `documents`
+- `document_chunks`
+- `handoff_requests`
+- `interaction_logs`
 
----
+Tambien crea las funciones:
 
-#### Rama Document (búsqueda semántica)
+- `match_faqs`
+- `match_document_chunks`
+- `set_updated_at`
 
-4. **Preparar DOC directo** — Prepara el texto de la consulta para vectorización.
-5. **Generar embedding** (`POST https://api.openai.com/...`) — Llama a la API de OpenAI para obtener el vector embedding del mensaje.
-6. **Code in JavaScript** — Procesa y formatea el embedding resultante.
-7. **HTTP Request** (`POST http://172.20.0.1:3001/...`) — Consulta el servicio local de búsqueda vectorial con el embedding generado.
-8. **Code in JavaScript1** — Extrae y rankea los fragmentos de documentos más similares.
-9. **AI Agent1** (con **OpenAI Chat Model1**) — Genera una respuesta en lenguaje natural basándose en los fragmentos recuperados.
-10. **Code in JavaScript2** — Post-procesa la respuesta del agente antes de enviarla.
+## Ingesta FAQ
 
----
+Dry run:
 
-#### Rama Fallback (agente IA general)
+```powershell
+.\.venv\Scripts\python .\scripts\ingest_faqs.py --dry-run --skip-embeddings
+```
 
-4. **AI Agent** (con **OpenAI Chat Model**, memoria y herramientas) — Procesa el mensaje con un agente conversacional que mantiene contexto de sesión.
-5. **Parsear clasificación** — Extrae del output del agente la clasificación de intención estructurada en JSON.
-6. **Necesita aclaración?** — Evalúa si el agente requiere más información del usuario:
-   - `true` → **Respuesta clarificación** genera un mensaje pidiendo datos adicionales
-   - `false` → continúa al siguiente condicional
-7. **If** — Determina si hay una respuesta directa disponible:
-   - `true` → **Respuesta directa** formatea la respuesta final
-   - `false` → redirige a la rama FAQ para intentar resolver con la base de datos
+Carga real:
 
----
+```powershell
+.\.venv\Scripts\python .\scripts\ingest_faqs.py
+```
 
-#### Salida unificada
+Contrato esperado del CSV:
 
-Todos los caminos convergen en **Send message**, que envía la respuesta final al usuario a través de WhatsApp Cloud API.
+- `tema`
+- `subtemas`
+- `posible_pregunta`
+- `respuesta`
 
-![alt text](image.png)
+## Workflows n8n
 
-> Desarrollo en progreso, la diagramación del flujo todavía no está terminada.
+Fuentes locales:
+
+1. `faq_answer_flow.js`
+2. `document_rag_flow.js`
+3. `hybrid_answer_flow.js`
+4. `clarification_flow.js`
+5. `handoff_flow.js`
+6. `unsupported_message_flow.js`
+7. `chatbot_fce.js`
+
+El workflow principal depende de:
+
+- clasificacion con OpenAI por `HTTP Request`
+- sub-workflows ejecutados via `Execute Workflow`
+- envio por `WhatsApp Business Cloud`
+- persistencia en Postgres
+
+## Credenciales requeridas en n8n
+
+Necesarias:
+
+- `Postgres`
+- `OpenAI API Key`
+- `WhatsApp Cloud API`
+
+Nodos que todavia requieren asignacion manual de credencial OpenAI:
+
+- `faq_answer_flow` -> `Get Query Embedding`
+- `document_rag_flow` -> `Get Query Embedding`
+- `document_rag_flow` -> `Generate Grounded Answer`
+- `Chatbot - FCE` -> `Intent Classifier`
+
+## Configuracion pendiente para operacion real
+
+- asignar manualmente credenciales OpenAI en n8n
+- verificar la credencial de WhatsApp en `Send WhatsApp Reply`
+- revisar el `webhook` de entrada con payload real de Meta
+- activar/publicar el workflow principal cuando el wiring final este validado
+
+## Notas sobre .env
+
+El `.env` del repo se usa para scripts locales, no para resolver automaticamente
+credenciales dentro de n8n.
+
+Los workflows de n8n ya no dependen de variables de entorno para OpenAI:
+
+- URL fija: `https://api.openai.com/v1`
+- modelo de chat fijo: `gpt-4.1-mini`
+- modelo de embeddings fijo: `text-embedding-3-small`
