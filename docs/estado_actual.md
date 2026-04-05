@@ -9,7 +9,8 @@ Hasta este punto se implemento la base funcional del MVP:
 - FAQs cargadas con embeddings
 - workflows creados en n8n
 - workflow principal enlazado con sus sub-workflows
-- respuesta outbound migrada al nodo oficial de WhatsApp
+- respuesta outbound migrada a `HTTP Request` contra la Cloud API de WhatsApp
+- menu guiado inicial por temas y preguntas frecuentes
 - path FAQ validado end-to-end con recuperacion y ruteo correctos
 
 ## Proceso ejecutado
@@ -103,7 +104,14 @@ Se hicieron estos ajustes relevantes:
   - embeddings: `https://api.openai.com/v1/embeddings`
   - modelo embeddings: `text-embedding-3-small`
   - modelo chat: `gpt-4.1-mini`
-- se reemplazo el nodo de salida por el nodo oficial `WhatsApp Business Cloud`
+- se reemplazo el nodo de salida por `HTTP Request` hacia la Cloud API de WhatsApp
+- se agrego deteccion de saludos genericos para disparar un menu inicial por temas
+- se agrego un segundo menu dinamico con hasta 5 preguntas por tema
+- la seleccion de una FAQ desde el menu responde directo sin pasar por embeddings
+- se importo el workflow final en la base SQLite real de n8n para que la UI y la ejecucion queden sincronizadas
+- se normalizo el telefono outbound reemplazando `549` por `54`
+- se corrigio el truncado de filas en listas interactivas para respetar los limites de Meta
+- se fijo `Route Conversation Entry` con `numberOfOutputs = 6` para cubrir todas las ramas
 - se rediseño el workflow principal para que:
   - genere embedding de la consulta
   - consulte un candidato FAQ y uno documental
@@ -149,7 +157,8 @@ Estado despues del fix:
 - FAQs cargadas
 - sub-workflows creados
 - workflow principal creado
-- envio outbound por nodo oficial de WhatsApp
+- envio outbound por `HTTP Request` a la Cloud API de WhatsApp
+- menu guiado y payload outbound corregidos en la instancia real de n8n
 - path FAQ probado y funcionando
 
 ### Pendiente

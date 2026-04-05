@@ -14,14 +14,16 @@ El workflow [chatbot_fce.js](/C:/Users/User/Desktop/Lucas/FCE/automatizacion-n8n
 3. identifica o crea el usuario
 4. abre o reutiliza una conversacion
 5. aplica guardrails basicos
-6. genera embedding de la consulta
-7. busca la mejor FAQ candidata
-8. busca el mejor candidato documental
-9. clasifica el tipo de consulta
-10. aplica una politica de resolucion
-11. ejecuta el sub-flujo correspondiente
-12. envia la respuesta por WhatsApp
-13. registra trazabilidad en Postgres
+6. si detecta un saludo generico arma un menu inicial por temas desde `faqs`
+7. si el usuario elige un tema arma una segunda lista con hasta 5 preguntas
+8. si el usuario elige una FAQ responde directamente esa respuesta
+9. si no aplica menu, genera embedding de la consulta
+10. busca la mejor FAQ candidata y el mejor candidato documental
+11. clasifica el tipo de consulta
+12. aplica una politica de resolucion
+13. ejecuta el sub-flujo correspondiente
+14. envia la respuesta por WhatsApp via `HTTP Request`
+15. registra trazabilidad en Postgres
 
 ## Como decide responder
 
@@ -37,6 +39,7 @@ Senales usadas:
 
 Posibles salidas:
 
+- `guided_menu`
 - `faq`
 - `document_search`
 - `hybrid`
@@ -88,9 +91,11 @@ Base de datos:
 
 Workflows:
 
+- `Route Conversation Entry` para ver si entró en menu guiado, FAQ elegida o flujo estandar
 - `FAQ Candidate Lookup` para verificar score FAQ
 - `Parse Query Type` para ver si OpenAI devolvio un formato parseable
 - `Resolution Policy` para confirmar el intent final
+- `Build WhatsApp Request` para confirmar el payload final y la normalizacion `549 -> 54`
 
 ## Troubleshooting rapido
 
@@ -105,7 +110,10 @@ Si no responde por WhatsApp:
 
 1. revisar credencial `WhatsApp Cloud API`
 2. revisar `phoneNumberId`
-3. revisar el payload normalizado del webhook
+3. revisar `WHATSAPP_PHONE_NUMBER_ID` y `WHATSAPP_GRAPH_VERSION`
+4. revisar el payload `whatsapp_request_body` en `Build WhatsApp Request`
+5. revisar que `to` salga normalizado de `549...` a `54...`
+6. revisar que cada `row.title` no supere 24 caracteres y `row.description` no supere 72
 
 Si no encuentra FAQs:
 

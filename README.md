@@ -12,7 +12,9 @@ El proyecto ya tiene implementada la base operativa:
 - esquema SQL aplicado
 - FAQs cargadas en Postgres con embeddings reales
 - sub-workflows y workflow principal creados en n8n
-- envio de respuestas por el nodo oficial `WhatsApp Business Cloud`
+- envio de respuestas por `HTTP Request` a la Cloud API de WhatsApp
+- menu guiado inicial por temas y preguntas frecuentes
+- workflow `Chatbot - FCE` sincronizado en la instancia local de n8n
 - path FAQ validado con recuperacion semantica real y ruteo correcto hacia
   `faq_answer_flow`
 
@@ -87,12 +89,17 @@ Fuentes locales:
 
 El workflow principal depende de:
 
+- menu guiado inicial por temas y preguntas frecuentes
 - embedding de consulta + chequeos candidatos FAQ/documento
 - clasificacion de tipo de consulta con el nodo oficial `OpenAI`
 - politica de resolucion basada en evidencia recuperada
 - sub-workflows ejecutados via `Execute Workflow`
-- envio por `WhatsApp Business Cloud`
+- envio por `HTTP Request` hacia la Cloud API de WhatsApp
 - persistencia en Postgres
+
+Adicionalmente, la salida WhatsApp normaliza telefonos argentinos con
+`549 -> 54` y recorta titulos/descripciones de listas para respetar los
+limites del payload interactivo de Meta.
 
 ### Politica de clasificacion y routing
 
