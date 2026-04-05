@@ -10,6 +10,7 @@ Hasta este punto se implemento la base funcional del MVP:
 - workflows creados en n8n
 - workflow principal enlazado con sus sub-workflows
 - respuesta outbound migrada al nodo oficial de WhatsApp
+- path FAQ validado end-to-end con recuperacion y ruteo correctos
 
 ## Proceso ejecutado
 
@@ -39,7 +40,7 @@ Acciones realizadas:
 
 - instalacion de Visual Studio Build Tools 2022
 - compilacion de `pgvector v0.8.1`
-- copia de los binarios y scripts SQL a la instalacion de PostgreSQL
+- copia de binarios y scripts SQL a la instalacion de PostgreSQL
 - ejecucion de `CREATE EXTENSION IF NOT EXISTS vector;` en la base `chatbot_fce`
 
 Resultado confirmado:
@@ -100,10 +101,43 @@ Se hicieron estos ajustes relevantes:
 - se elimino la dependencia de variables de entorno para OpenAI dentro de n8n
 - se fijaron:
   - embeddings: `https://api.openai.com/v1/embeddings`
-  - chat completions: `https://api.openai.com/v1/chat/completions`
-  - modelo chat: `gpt-4.1-mini`
   - modelo embeddings: `text-embedding-3-small`
-- se reemplazo el nodo `HTTP Request` de salida por el nodo oficial `WhatsApp Business Cloud`
+  - modelo chat: `gpt-4.1-mini`
+- se reemplazo el nodo de salida por el nodo oficial `WhatsApp Business Cloud`
+- se rediseño el workflow principal para que:
+  - genere embedding de la consulta
+  - consulte un candidato FAQ y uno documental
+  - clasifique tipo de consulta en vez de decidir la fuente
+  - aplique una politica de resolucion basada en evidencia
+- se corrigieron los nodos `Execute Workflow Trigger` de los sub-flujos para declarar inputs explicitos
+- se corrigio el mapeo de `workflowInputs` desde el workflow principal hacia los sub-flujos
+- se migraron las llamadas de chat a OpenAI al nodo oficial `OpenAI` en:
+  - `Chatbot - FCE` -> `Query Type Classifier`
+  - `document_rag_flow` -> `Generate Grounded Answer`
+- se robustecio `Parse Query Type` para aceptar mas de un formato de salida del nodo oficial de OpenAI
+
+### 7. Validacion del path FAQ
+
+Se probo la consulta:
+
+- `cuanto me dura la regularidad de una materia?`
+
+Hallazgo durante debugging:
+
+- la FAQ se recuperaba bien desde Postgres con score alto
+- el problema estaba en el parseo de salida del clasificador OpenAI
+- al no parsear esa salida, el workflow marcaba `invalid_classifier_output` y terminaba en `clarification_needed`
+
+Correccion aplicada:
+
+- fallback mas robusto en `Parse Query Type`
+- politica de resolucion mantenida basada en evidencia FAQ/documental
+
+Estado despues del fix:
+
+- el path FAQ funciona correctamente
+- el score FAQ queda disponible en `interaction_logs`
+- la consulta ya no depende de que OpenAI responda en un unico formato JSON
 
 ## Estado operativo actual
 
@@ -116,13 +150,14 @@ Se hicieron estos ajustes relevantes:
 - sub-workflows creados
 - workflow principal creado
 - envio outbound por nodo oficial de WhatsApp
+- path FAQ probado y funcionando
 
 ### Pendiente
 
-- asignar manualmente credenciales OpenAI en n8n
-- verificar la credencial `WhatsApp Cloud API` en el nodo de envio
+- asignar manualmente credenciales OpenAI en n8n para los nodos de embeddings
 - revisar payload real del webhook de WhatsApp inbound
 - activar/publicar `Chatbot - FCE`
+- cargar corpus documental real en `documents` y `document_chunks`
 
 ## Credenciales necesarias en n8n
 
@@ -134,15 +169,14 @@ Asignacion manual OpenAI pendiente en:
 
 - `faq_answer_flow` -> `Get Query Embedding`
 - `document_rag_flow` -> `Get Query Embedding`
-- `document_rag_flow` -> `Generate Grounded Answer`
-- `Chatbot - FCE` -> `Intent Classifier`
 
 ## Riesgos o limitaciones actuales
 
 - el `Webhook WhatsApp Inbound` todavia no fue validado contra un payload real de Meta dentro de esta implementacion
-- la clasificacion usa `HTTP Request` a OpenAI, no el nodo oficial de OpenAI
+- los embeddings siguen usando `HTTP Request` porque el nodo oficial de embeddings de n8n no encaja de forma directa con el flujo SQL actual
 - no se publico todavia el workflow principal
 - no hay aun carga de documentos institucionales en `documents` y `document_chunks`, por lo que `document_rag_flow` queda listo en estructura pero no con corpus real
+- falta validar con mas consultas reales los thresholds y reglas de `personal_case`
 
 ## Comandos y verificaciones ya ejecutadas
 

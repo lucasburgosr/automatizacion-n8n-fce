@@ -3,7 +3,20 @@ import { workflow, trigger, node, expr, newCredential, sticky } from '@n8n/workf
 const inbound = trigger({
   type: 'n8n-nodes-base.executeWorkflowTrigger',
   version: 1.1,
-  config: { name: 'Execute Workflow Trigger', position: [240, 300] },
+  config: {
+    name: 'Execute Workflow Trigger',
+    parameters: {
+      inputSource: 'workflowInputs',
+      workflowInputs: {
+        values: [
+          { name: 'text', type: 'string' },
+          { name: 'similarityThreshold', type: 'number' },
+          { name: 'maxMatches', type: 'number' }
+        ]
+      }
+    },
+    position: [240, 300]
+  },
   output: [{ text: 'Necesito saber cuánto dura la regularidad de una materia', similarityThreshold: 0.84, maxMatches: 3 }]
 });
 

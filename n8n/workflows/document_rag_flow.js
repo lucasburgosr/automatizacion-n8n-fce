@@ -3,7 +3,20 @@ import { workflow, trigger, node, expr, newCredential, sticky } from '@n8n/workf
 const inbound = trigger({
   type: 'n8n-nodes-base.executeWorkflowTrigger',
   version: 1.1,
-  config: { name: 'Execute Workflow Trigger', position: [240, 300] },
+  config: {
+    name: 'Execute Workflow Trigger',
+    parameters: {
+      inputSource: 'workflowInputs',
+      workflowInputs: {
+        values: [
+          { name: 'text', type: 'string' },
+          { name: 'similarityThreshold', type: 'number' },
+          { name: 'maxMatches', type: 'number' }
+        ]
+      }
+    },
+    position: [240, 300]
+  },
   output: [{ text: 'Necesito saber cómo pedir una extensión de regularidad', similarityThreshold: 0.8, maxMatches: 5 }]
 });
 
@@ -58,23 +71,38 @@ const composeContext = node({
 });
 
 const draftResponse = node({
-  type: 'n8n-nodes-base.httpRequest',
-  version: 4.4,
+  type: '@n8n/n8n-nodes-langchain.openAi',
+  version: 2.1,
   config: {
     name: 'Generate Grounded Answer',
     parameters: {
-      method: 'POST',
-      url: 'https://api.openai.com/v1/chat/completions',
-      authentication: 'genericCredentialType',
-      genericAuthType: 'httpHeaderAuth',
-      sendBody: true,
-      specifyBody: 'json',
-      jsonBody: expr('{{ { model: "gpt-4.1-mini", temperature: 0.1, messages: [ { role: "system", content: "Responde solo con información del contexto. Si el contexto no alcanza, dilo explícitamente." }, { role: "user", content: "Consulta: " + $json.query + "\\n\\nContexto:\\n" + $json.context } ] } }}')
+      resource: 'text',
+      operation: 'response',
+      modelId: { mode: 'id', value: 'gpt-4.1-mini' },
+      responses: {
+        values: [
+          {
+            role: 'system',
+            type: 'text',
+            content: 'Responde solo con informacion del contexto. Si el contexto no alcanza, dilo explicitamente.'
+          },
+          {
+            role: 'user',
+            type: 'text',
+            content: expr('{{ "Consulta: " + $json.query + "\\n\\nContexto:\\n" + $json.context }}')
+          }
+        ]
+      },
+      simplify: true,
+      options: {
+        temperature: 0.1,
+        store: false
+      }
     },
-    credentials: { httpHeaderAuth: newCredential('OpenAI API Key') },
+    credentials: { openAiApi: newCredential('OpenAI API Key') },
     position: [1440, 300]
   },
-  output: [{ choices: [{ message: { content: 'Podés pedir una extensión en casos especiales como licencias o movilidad estudiantil.' } }] }]
+  output: [{ output: [{ content: [{ text: 'Podes pedir una extension en casos especiales como licencias o movilidad estudiantil.' }] }] }]
 });
 
 const buildResult = node({
@@ -85,7 +113,7 @@ const buildResult = node({
     parameters: {
       mode: 'runOnceForAllItems',
       language: 'javaScript',
-      jsCode: "const root = items[0]?.json || {}; const source = $('Compose Context').item.json; const response = root.choices?.[0]?.message?.content || null; const confidence = Number(source.best_similarity || 0); return [{ json: { status: response && confidence >= 0.8 ? 'answered' : 'low_confidence', response_text: response, source_type: 'document', source_ids: (source.matches || []).map((item) => item.id), confidence, needs_clarification: confidence < 0.8, needs_handoff: false } }];"
+      jsCode: "const root = items[0]?.json || {}; const source = $('Compose Context').item.json; const response = root.output?.[0]?.content?.[0]?.text || null; const confidence = Number(source.best_similarity || 0); return [{ json: { status: response && confidence >= 0.8 ? 'answered' : 'low_confidence', response_text: response, source_type: 'document', source_ids: (source.matches || []).map((item) => item.id), confidence, needs_clarification: confidence < 0.8, needs_handoff: false } }];"
     },
     position: [1740, 300]
   },

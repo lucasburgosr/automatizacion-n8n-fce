@@ -49,8 +49,12 @@ Nombre: Chatbot - FCE
 3. Upsert User
 4. Open Or Resume Conversation
 5. Basic Guardrails
-6. Intent Classifier
-7. Route by Intent
+6. Get Query Embedding
+7. FAQ Candidate Lookup
+8. Document Candidate Lookup
+9. Query Type Classifier
+10. Resolution Policy
+11. Route by Intent
 
 ## Sub-workflows
 
@@ -124,3 +128,9 @@ Codex debe:
 - las FAQs deben ser consultadas primero en `faq_answer_flow`
 - usar búsqueda semántica sobre `embedding`
 - aplicar threshold de similitud antes de responder
+- el clasificador no debe decidir si algo "es FAQ" o "es documento" sin evidencia
+- la decisión final de ruteo debe combinar:
+  - tipo de consulta inferido por el clasificador
+  - mejor score FAQ recuperado
+  - mejor score documental recuperado
+  - señales de caso personal o derivación humana

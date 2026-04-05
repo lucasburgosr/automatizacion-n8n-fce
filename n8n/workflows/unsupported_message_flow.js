@@ -3,7 +3,18 @@ import { workflow, trigger, node } from '@n8n/workflow-sdk';
 const inbound = trigger({
   type: 'n8n-nodes-base.executeWorkflowTrigger',
   version: 1.1,
-  config: { name: 'Execute Workflow Trigger', position: [240, 300] },
+  config: {
+    name: 'Execute Workflow Trigger',
+    parameters: {
+      workflowInputs: {
+        values: [
+          { name: 'message_type', type: 'string' },
+          { name: 'text', type: 'string' }
+        ]
+      }
+    },
+    position: [240, 300]
+  },
   output: [{ message_type: 'image' }]
 });
 

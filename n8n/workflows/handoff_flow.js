@@ -3,7 +3,19 @@ import { workflow, trigger, node, expr, newCredential, sticky } from '@n8n/workf
 const inbound = trigger({
   type: 'n8n-nodes-base.executeWorkflowTrigger',
   version: 1.1,
-  config: { name: 'Execute Workflow Trigger', position: [240, 300] },
+  config: {
+    name: 'Execute Workflow Trigger',
+    parameters: {
+      workflowInputs: {
+        values: [
+          { name: 'conversation_id', type: 'string' },
+          { name: 'reason', type: 'string' },
+          { name: 'text', type: 'string' }
+        ]
+      }
+    },
+    position: [240, 300]
+  },
   output: [{ conversation_id: 'conv-id', reason: 'outside_scope', text: 'Necesito validar una excepción con una persona' }]
 });
 
